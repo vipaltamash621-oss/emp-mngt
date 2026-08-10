@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     unzip \
     mariadb-client \
+    netcat-openbsd \
     nodejs \
     npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -61,13 +62,9 @@ RUN sed -i 's|DocumentRoot /var/www/html/public|DocumentRoot /var/www/html/publi
 # Create .env file if not exists
 RUN if [ ! -f .env ]; then cp .env.example .env; fi
 
-# Create entrypoint script
-RUN echo '#!/bin/bash\n\
-set -e\n\
-php artisan key:generate --force\n\
-php artisan migrate --force\n\
-exec apache2-foreground' > /entrypoint.sh && \
-chmod +x /entrypoint.sh
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 80
@@ -76,5 +73,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost/ || exit 1
 
-# Start Apache with migrations
+# Start with entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
