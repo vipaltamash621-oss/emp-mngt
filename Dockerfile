@@ -30,22 +30,26 @@ RUN a2enmod rewrite
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Copy application
+# Copy application first
 COPY . .
 
+# Create necessary directories and set permissions BEFORE composer
+RUN mkdir -p bootstrap/cache storage/logs \
+    && chmod -R 777 bootstrap/cache storage
+
+# Copy composer from official image
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set COMPOSER_ALLOW_SUPERUSER to allow root user
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
 # Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist 2>&1
 
 # Install Node dependencies and build assets
-RUN npm install && npm run build
+RUN npm install --production=false && npm run build
 
-# Generate app key
-RUN cp .env.example .env && php artisan key:generate
-
-# Set permissions
+# Set proper permissions
 RUN chown -R www-data:www-data /var/www/html && \
     chmod -R 755 /var/www/html && \
     chmod -R 755 storage/ bootstrap/cache/
@@ -54,8 +58,13 @@ RUN chown -R www-data:www-data /var/www/html && \
 RUN sed -i 's|DocumentRoot /var/www/html/public|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf && \
     sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s|AllowOverride None|AllowOverride All|' /etc/apache2/apache2.conf
 
+# Create .env file if not exists
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
+
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
+set -e\n\
+php artisan key:generate --force\n\
 php artisan migrate --force\n\
 exec apache2-foreground' > /entrypoint.sh && \
 chmod +x /entrypoint.sh
