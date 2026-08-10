@@ -60,7 +60,8 @@ RUN chown -R www-data:www-data /var/www/html && \
 
 # Configure Apache to serve public folder
 RUN sed -i 's|DocumentRoot /var/www/html/public|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf && \
-    sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s|AllowOverride None|AllowOverride All|' /etc/apache2/apache2.conf
+    sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s|AllowOverride None|AllowOverride All|' /etc/apache2/apache2.conf && \
+    sed -i '1i ServerName localhost' /etc/apache2/apache2.conf
 
 # Create .env file if not exists
 RUN if [ ! -f .env ]; then cp .env.example .env; fi
