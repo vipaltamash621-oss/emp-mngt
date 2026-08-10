@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreDesignationRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'title' => 'required|string|max:255|unique:designations,title,' . ($this->designation->id ?? 'NULL'),
+            'slug' => 'required|string|max:255|unique:designations,slug,' . ($this->designation->id ?? 'NULL'),
+            'status' => 'nullable|boolean',
+        ];
+    }
+}
