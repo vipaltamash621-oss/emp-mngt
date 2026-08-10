@@ -1,0 +1,21 @@
+# This project is a Laravel backend application and cannot be deployed on Netlify
+# Netlify only supports static sites and serverless functions
+
+# For this Laravel Employee Management System, deploy to:
+# 1. Railway.app - Easy Laravel deployment
+# 2. Render.com - Free tier available
+# 3. Heroku - Traditional option
+# 4. Traditional PHP hosting with MySQL
+
+# If you want to deploy the frontend separately:
+# Configure to only build and deploy the public/build directory after Laravel serves it
+
+[build]
+  # This won't work for Laravel - see deployment guides below
+  command = "echo 'This is a Laravel app, not a static site. See DEPLOYMENT.md'"
+  publish = "public"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.php"
+  status = 200
