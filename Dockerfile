@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Disable conflicting Apache MPMs (only keep mpm_prefork)
+RUN a2dismod mpm_event mpm_worker mpm_winnt 2>/dev/null || true && \
+    a2enmod mpm_prefork
+
 # Install PHP extensions
 RUN docker-php-ext-install \
     pdo_mysql \
