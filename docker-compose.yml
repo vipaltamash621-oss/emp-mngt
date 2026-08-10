@@ -10,6 +10,7 @@ services:
       MYSQL_ROOT_PASSWORD: root_password
       MYSQL_PASSWORD: emp_password
       MYSQL_USER: emp_user
+      MYSQL_INITDB_SKIP_TZINFO: 1
     ports:
       - "3306:3306"
     volumes:
@@ -17,10 +18,11 @@ services:
     networks:
       - emp_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "emp_user", "-pemp_password"]
       timeout: 20s
-      retries: 10
+      retries: 15
       interval: 5s
+      start_period: 30s
 
   app:
     build:
@@ -41,6 +43,9 @@ services:
       - DB_DATABASE=emp_management
       - DB_USERNAME=emp_user
       - DB_PASSWORD=emp_password
+      - MYSQL_USER=emp_user
+      - MYSQL_PASSWORD=emp_password
+      - MYSQL_DATABASE=emp_management
     volumes:
       - .:/var/www/html
     depends_on:
@@ -53,7 +58,7 @@ services:
       timeout: 10s
       retries: 3
       interval: 30s
-      start_period: 40s
+      start_period: 60s
 
   phpmyadmin:
     image: phpmyadmin:latest
@@ -63,10 +68,12 @@ services:
       PMA_HOST: db
       PMA_USER: emp_user
       PMA_PASSWORD: emp_password
+      PMA_DATABASE: emp_management
     ports:
       - "8080:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - emp_network
 

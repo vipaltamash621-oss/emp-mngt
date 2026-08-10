@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     unzip \
     mariadb-client \
-    netcat-openbsd \
     nodejs \
     npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -70,7 +69,7 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost/ || exit 1
 
 # Start with entrypoint script
