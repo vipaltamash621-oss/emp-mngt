@@ -1,0 +1,25 @@
+# Railway.app Configuration
+
+[build]
+builder = "dockerfile"
+dockerfile = "Dockerfile"
+
+[deploy]
+numReplicas = 1
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+sleepApplication = false
+
+[environment]
+APP_NAME = "Employee Management System"
+APP_ENV = "production"
+APP_DEBUG = "false"
+LOG_CHANNEL = "stack"
+CACHE_DRIVER = "file"
+QUEUE_CONNECTION = "sync"
+SESSION_DRIVER = "file"
+
+# Database will be added by Railway's MySQL plugin
+# Add these after adding MySQL:
+# DB_CONNECTION = "mysql"
+# DB_PORT = "3306"
