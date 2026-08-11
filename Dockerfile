@@ -17,7 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Disable conflicting Apache MPMs (only keep mpm_prefork)
 RUN a2dismod mpm_event mpm_worker mpm_winnt 2>/dev/null || true && \
-    a2enmod mpm_prefork
+    a2dismod mpm_event mpm_worker mpm_winnt 2>/dev/null || true
+
+# Clean up any duplicate module loads
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.load && \
+    rm -f /etc/apache2/mods-enabled/mpm_worker.load && \
+    rm -f /etc/apache2/mods-enabled/mpm_winnt.load
 
 # Install PHP extensions
 RUN docker-php-ext-install \
@@ -28,8 +33,8 @@ RUN docker-php-ext-install \
     bcmath \
     gd
 
-# Enable Apache modules
-RUN a2enmod rewrite headers expires deflate
+# Enable Apache modules AFTER disabling conflicting ones
+RUN a2enmod mpm_prefork rewrite headers expires deflate
 
 # Set working directory
 WORKDIR /var/www/html

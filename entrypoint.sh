@@ -67,7 +67,7 @@ php artisan config:cache || true
 
 # Verify Apache configuration
 log_info "Testing Apache configuration..."
-apache2ctl -t
+apache2ctl -t 2>&1
 if [ $? -ne 0 ]; then
     log_error "Apache configuration test failed!"
     apache2ctl -t 2>&1
