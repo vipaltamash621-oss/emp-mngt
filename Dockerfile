@@ -29,7 +29,7 @@ RUN docker-php-ext-install \
     gd
 
 # Enable Apache modules
-RUN a2enmod rewrite
+RUN a2enmod rewrite headers expires deflate
 
 # Set working directory
 WORKDIR /var/www/html
@@ -58,9 +58,12 @@ RUN chown -R www-data:www-data /var/www/html && \
     chmod -R 755 /var/www/html && \
     chmod -R 755 storage/ bootstrap/cache/
 
-# Configure Apache to serve public folder
-RUN sed -i 's|DocumentRoot /var/www/html/public|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf && \
-    sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s|AllowOverride None|AllowOverride All|' /etc/apache2/apache2.conf
+# Copy custom Laravel VirtualHost configuration
+COPY laravel-vhost.conf /etc/apache2/sites-available/000-default.conf
+
+# Disable default site and enable our config
+RUN a2dissite 000-default || true && \
+    a2ensite 000-default
 
 # Add ServerName to suppress warning
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
