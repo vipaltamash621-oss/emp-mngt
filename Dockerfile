@@ -79,12 +79,16 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Generate APP_KEY at build time (fallback)
+RUN if [ ! -f .env ]; then cp .env.example .env; fi && \
+    php artisan key:generate --force || true
+
 # Expose port
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Health check - be lenient with startup time
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
     CMD curl -f http://localhost/ || exit 1
 
-# Start with entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
+# Start with entrypoint script  
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]

@@ -1,83 +1,103 @@
 #!/bin/bash
-set -e
+
+# Don't exit on error - we need to capture and debug
+set +e
 
 echo "🚀 Starting Employee Management System..."
+echo "Container PID: $$"
 
-# Check if DB_HOST is set, if not, skip database operations
+# Function to log errors
+log_error() {
+    echo "[ERROR] $1" >&2
+}
+
+# Function to log info
+log_info() {
+    echo "[INFO] $1"
+}
+
+trap 'log_error "Script interrupted"; exit 130' INT TERM
+
+# Generate APP_KEY if empty (CRITICAL for Laravel)
+log_info "Checking APP_KEY..."
+if [ -z "$APP_KEY" ] || [ "$APP_KEY" == "no-key" ]; then
+    log_info "Generating APP_KEY..."
+    php artisan key:generate --force || log_error "Failed to generate APP_KEY"
+fi
+
+# Check if DB_HOST is set
 if [ -z "$DB_HOST" ]; then
-    echo "⚠️  DB_HOST not set, skipping database initialization"
+    log_info "DB_HOST not set - skipping database initialization"
 else
-    # Wait for MySQL to be ready
-    echo "⏳ Waiting for MySQL to be ready on host: $DB_HOST:$DB_PORT"
+    log_info "Waiting for MySQL on $DB_HOST:$DB_PORT..."
     max_attempts=120
-    attempt=1
+    attempt=0
 
-    while [ $attempt -le $max_attempts ]; do
-        if mysqladmin ping -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" --silent 2>/dev/null; then
-            echo "✅ MySQL is ready!"
+    while [ $attempt -lt $max_attempts ]; do
+        if mysqladmin ping -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" --connect-timeout=2 --silent 2>/dev/null; then
+            log_info "MySQL is ready!"
             break
         fi
-        if [ $((attempt % 10)) -eq 0 ]; then
-            echo "   Still waiting... Attempt $attempt/$max_attempts"
+        attempt=$((attempt + 1))
+        if [ $((attempt % 20)) -eq 0 ]; then
+            log_info "Still waiting... ($attempt/$max_attempts)"
         fi
         sleep 1
-        attempt=$((attempt + 1))
     done
 
-    if [ $attempt -le $max_attempts ]; then
-        # Clear config cache first
-        echo "🧹 Clearing config cache..."
-        php artisan config:clear || true
-
-        # Generate APP_KEY if not set
-        if [ -z "$APP_KEY" ] || [ "$APP_KEY" == "no-key" ]; then
-            echo "🔑 Generating APP_KEY..."
-            php artisan key:generate --force
-        fi
-
-        # Wait a moment for app key to settle
-        sleep 2
-
-        # Try to run migrations (non-blocking)
-        echo "📊 Running database migrations..."
-        php artisan migrate --force 2>&1 || {
-            echo "⚠️  Migration failed, retrying once..."
-            sleep 5
-            php artisan migrate --force 2>&1 || {
-                echo "⚠️  Migrations failed, but continuing..."
-            }
-        }
-
-        # Seed database with test data if needed
-        echo "🌱 Checking if database needs seeding..."
-        if [ -f database/seeders/DatabaseSeeder.php ]; then
-            php artisan db:seed --force 2>&1 || true
-        fi
-
-        # Final cache clear
-        echo "🧹 Final cache clear..."
-        php artisan config:cache || true
-        php artisan cache:clear || true
+    if [ $attempt -lt $max_attempts ]; then
+        log_info "Running migrations..."
+        php artisan migrate --force 2>&1
+        
+        log_info "Seeding database..."
+        php artisan db:seed --force 2>&1 || true
     else
-        echo "⚠️  MySQL timeout, but continuing anyway..."
+        log_info "MySQL timeout - continuing without database"
     fi
 fi
 
-# Ensure only one MPM is enabled
-echo "⚙️  Configuring Apache MPM..."
-a2dismod mpm_event mpm_worker mpm_winnt 2>/dev/null || true
-a2enmod mpm_prefork 2>/dev/null || true
+# Clear and rebuild Laravel caches
+log_info "Clearing caches..."
+php artisan config:clear || true
+php artisan cache:clear || true
+php artisan view:clear || true
 
-# Test Apache configuration
-echo "🔍 Testing Apache configuration..."
-if ! apache2ctl -t 2>&1 | grep -q "Syntax OK"; then
-    echo "❌ Apache configuration test failed!"
-    apache2ctl -t
+log_info "Rebuilding caches..."
+php artisan config:cache || true
+
+# Verify Apache configuration
+log_info "Testing Apache configuration..."
+apache2ctl -t
+if [ $? -ne 0 ]; then
+    log_error "Apache configuration test failed!"
+    apache2ctl -t 2>&1
     exit 1
 fi
 
-echo "✅ Apache configuration is valid"
-echo "✅ Setup complete! Starting Apache..."
+log_info "Apache configuration valid"
 
-# Start Apache in foreground
-exec apache2-foreground
+# Fix PHP-FPM socket permissions if it exists
+if [ -S /var/run/php-fpm.sock ]; then
+    chmod 666 /var/run/php-fpm.sock
+fi
+
+# Ensure permissions are correct
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
+
+log_info "Starting Apache in foreground..."
+log_info "Apache will listen on 0.0.0.0:80"
+
+# Start Apache - capture any startup errors
+apache2-foreground &
+APACHE_PID=$!
+
+log_info "Apache started with PID: $APACHE_PID"
+
+# Monitor Apache process
+while kill -0 $APACHE_PID 2>/dev/null; do
+    sleep 5
+done
+
+log_error "Apache process exited unexpectedly!"
+exit 1
